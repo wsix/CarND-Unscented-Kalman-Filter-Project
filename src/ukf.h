@@ -2,6 +2,7 @@
 #define UKF_H
 #include "Eigen/Dense"
 #include "measurement_package.h"
+#include "norm_rad.h"
 #include <vector>
 
 using Eigen::MatrixXd;
