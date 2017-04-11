@@ -22,25 +22,25 @@ UKF::UKF() {
   P_ = MatrixXd(5, 5);
 
   // Process noise standard deviation longitudinal acceleration in m/s^2
-  std_a_ = 12;
+  std_a_ = 0.6;
 
   // Process noise standard deviation yaw acceleration in rad/s^2
-  std_yawdd_ = 15;
+  std_yawdd_ = 0.6;
 
   // Laser measurement noise standard deviation position1 in m
-  std_laspx_ = 0.08;
+  std_laspx_ = 0.07;
 
   // Laser measurement noise standard deviation position2 in m
-  std_laspy_ = 0.08;
+  std_laspy_ = 0.07;
 
   // Radar measurement noise standard deviation radius in m
-  std_radr_ = 5;
+  std_radr_ = 0.05;
 
   // Radar measurement noise standard deviation angle in rad
-  std_radphi_ = 0.4;
+  std_radphi_ = 0.08;
 
   // Radar measurement noise standard deviation radius change in m/s
-  std_radrd_ = 0.8;
+  std_radrd_ = 0.08;
 
   // State dimension
   n_x_ = 5;
@@ -80,9 +80,25 @@ void UKF::ProcessMeasurement(MeasurementPackage meas_package) {
       double rho = meas_package.raw_measurements_[0];
       double phi = meas_package.raw_measurements_[1];
       double rho_dot = meas_package.raw_measurements_[2];
-      x_ << rho * cos(phi), rho * sin(phi), rho_dot, phi, 0;
+      double px = rho * cos(phi);
+      double py = rho * sin(phi);
+
+      if (fabs(px) < 0.00001 || fabs(py)<0.00001) {
+        px = 0.0001;
+        py = 0.0001;
+      }
+
+      x_ << px, py, rho_dot, phi, 0;
     } else if (meas_package.sensor_type_ == MeasurementPackage::LASER) {
-      x_ << meas_package.raw_measurements_[0], meas_package.raw_measurements_[1], 0, 0, 0;
+      double px = meas_package.raw_measurements_[0];
+      double py = meas_package.raw_measurements_[1];
+
+      if (fabs(px) < 0.00001 || fabs(py)<0.00001) {
+        px = 0.0001;
+        py = 0.0001;
+      }
+
+      x_ << px, py, 0, 0, 0;
     }
 
     P_ = MatrixXd(n_x_, n_x_);
@@ -145,7 +161,7 @@ void UKF::Prediction(double delta_t) {
 
   // Predict Sigma Points.
 
-  for (int i = 0; i< 2*n_aug_+1; i++)
+  for (int i = 0; i < 2 * n_aug_ + 1; i++)
   {
     //extract values for better readability
     double p_x = Xsig_aug(0,i);
@@ -218,8 +234,15 @@ void UKF::UpdateLidar(MeasurementPackage meas_package) {
 
   // transform sigma points into measurement space
   for (int i=0; i < 2*n_aug_+1; i++) {
-    Zsig(0, i) = Xsig_pred_(0, i);
-    Zsig(1, i) = Xsig_pred_(1, i);
+    double px = Xsig_pred_(0, i);
+    double py = Xsig_pred_(1, i);
+    if (fabs(px) < 0.00001 || fabs(py)<0.00001) {
+      px = 0.0001;
+      py = 0.0001;
+    }
+
+    Zsig(0, i) = px;
+    Zsig(1, i) = py;
   }
 
   //calculate mean predicted measurement
@@ -279,9 +302,14 @@ void UKF::UpdateRadar(MeasurementPackage meas_package) {
     double v = Xsig_pred_(2, i);
     double phi = Xsig_pred_(3, i);
 
+    if (fabs(px)<0.00001 || fabs(py)<0.00001) {
+      px = 0.0001;
+      py = 0.0001;
+    }
+
     Zsig(0, i) = sqrt(pow(px, 2) + pow(py, 2));
     Zsig(1, i) = atan(py / px);
-    if (Zsig(0, i) != 0) {
+    if (Zsig(0, i) > 0.00001) {
       Zsig(2, i) = (px * cos(phi) * v + py * sin(phi) * v) / Zsig(0, i);
     } else {
       Zsig(2, i) = 0;
